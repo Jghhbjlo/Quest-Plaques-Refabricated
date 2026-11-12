@@ -1,0 +1,22 @@
+pluginManagement {
+	repositories {
+		// Mirrors first: the official hosts are slow to reach from some networks.
+		maven {
+			name = 'Aliyun Gradle Plugin'
+			url = 'https://maven.aliyun.com/repository/gradle-plugin'
+		}
+		maven {
+			name = 'Aliyun Public'
+			url = 'https://maven.aliyun.com/repository/public'
+		}
+		maven {
+			name = 'Fabric'
+			url = 'https://maven.fabricmc.net/'
+		}
+		mavenCentral()
+		gradlePluginPortal()
+	}
+}
+
+// Should match your modid
+rootProject.name = 'quest-plaques-refabricated'

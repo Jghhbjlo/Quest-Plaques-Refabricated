@@ -1,0 +1,142 @@
+plugins {
+	id 'net.fabricmc.fabric-loom-remap' version "${loom_version}"
+	id 'maven-publish'
+}
+
+version = project.version
+group = project.group
+
+base {
+	archivesName = "quest-plaques-refabricated-${project.minecraft_version}"
+}
+
+repositories {
+	// Mirrors first: the official hosts are slow to reach from some networks.
+	maven {
+		name = "Aliyun Public"
+		url = "https://maven.aliyun.com/repository/public"
+	}
+	// Modrinth maven - used for Advancement Plaques, Iceberg and Forge Config API Port, which are
+	// all published there for 1.21.1.
+	maven {
+		name = "Modrinth"
+		url = "https://api.modrinth.com/maven"
+		content {
+			includeGroup "maven.modrinth"
+		}
+	}
+	maven {
+		name = "Fabric"
+		url = "https://maven.fabricmc.net/"
+	}
+	mavenCentral()
+	// Optional FTB Quests integration (compile time only).
+	maven {
+		name = "FTB"
+		url = "https://maven.ftb.dev/releases"
+	}
+	maven {
+		name = "Architectury"
+		url = "https://maven.architectury.dev/"
+	}
+}
+
+loom {
+	splitEnvironmentSourceSets()
+
+	// Needed so we can swap out Minecraft#toast and build an Iceberg CustomItemRenderer.
+	accessWidenerPath = file("src/main/resources/quest-plaques-refabricated.accesswidener")
+
+	mods {
+		"quest-plaques-refabricated" {
+			sourceSet sourceSets.main
+			sourceSet sourceSets.client
+		}
+	}
+}
+
+configurations {
+	// The client source set renders the plaques, so it needs the same mod dependencies as main
+	// (Advancement Plaques, Iceberg, FTB Quests for the optional integration).
+	clientImplementation.extendsFrom(implementation)
+	clientCompileOnly.extendsFrom(compileOnly)
+	clientRuntimeOnly.extendsFrom(runtimeOnly)
+}
+
+dependencies {
+	// To change the versions see the gradle.properties file
+	minecraft "com.mojang:minecraft:${project.minecraft_version}"
+
+	// Mojang official mappings are used here so that the port can stay close to the original
+	// 1.18.2 code (which was written against official mappings) and to the upstream mods below,
+	// all of which ship Fabric builds compiled with official mappings.
+	mappings loom.officialMojangMappings()
+
+	modImplementation "net.fabricmc:fabric-loader:${project.loader_version}"
+
+	// Fabric API. This is technically optional, but you probably want it anyway.
+	modImplementation "net.fabricmc.fabric-api:fabric-api:${project.fabric_api_version}"
+
+	// Required dependencies.
+	modImplementation "maven.modrinth:forge-config-api-port:${project.forge_config_api_version}"
+	modImplementation "maven.modrinth:advancement-plaques:${project.advancement_plaques_version}"
+	modImplementation "maven.modrinth:iceberg:${project.iceberg_version}"
+
+	// Optional FTB Quests compatibility. Compile only: the integration is loaded reflectively
+	// at runtime and simply does not initialise if FTB Quests is not installed.
+	// Transitive dependencies are disabled on purpose: FTB Library pulls optional integration
+	// artifacts (JEI API, amecs, ...) that are not published to the repositories used above and
+	// are not needed to compile the two classes this addon calls.
+	modCompileOnly("dev.ftb.mods:ftb-quests-fabric:${project.ftb_quests_version}") { transitive = false }
+	modCompileOnly("dev.ftb.mods:ftb-library-fabric:${project.ftb_library_version}") { transitive = false }
+	modCompileOnly("dev.architectury:architectury-fabric:${project.architectury_version}") { transitive = false }
+}
+
+processResources {
+	def version = project.version
+	inputs.property "version", version
+
+	filesMatching("fabric.mod.json") {
+		expand "version": version
+	}
+}
+
+tasks.withType(JavaCompile).configureEach {
+	it.options.release = 21
+}
+
+java {
+	// Loom will automatically attach sourcesJar to a RemapSourcesJar task and to the "build" task
+	// if it is present.
+	// If you remove this line, sources will not be generated.
+	withSourcesJar()
+
+	sourceCompatibility = JavaVersion.VERSION_21
+	targetCompatibility = JavaVersion.VERSION_21
+}
+
+jar {
+	def projectName = project.name
+	inputs.property "projectName", projectName
+
+	from("LICENSE") {
+		rename { "${it}_$projectName"}
+	}
+}
+
+// configure the maven publication
+publishing {
+	publications {
+		create("mavenJava", MavenPublication) {
+			from components.java
+		}
+	}
+
+	// See https://docs.gradle.org/current/userguide/publishing_maven.html for information on how to set up publishing.
+	repositories {
+		// Add repositories to publish to here.
+		// Notice: This block does NOT have the same function as the block in the top level.
+		// The repositories here will be used for publishing your artifact, not for
+		// retrieving dependencies.
+	}
+}
